@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cedar Point Check-In</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #1a1a1a; min-height: 100vh; }
+  .shell { max-width: 480px; margin: 0 auto; background: #fff; min-height: 100vh; padding: 1.5rem 1.25rem; }
+  .page { display: none; }
+  .page.active { display: block; }
+  h2 { font-size: 20px; font-weight: 600; margin-bottom: 1.5rem; }
+  .field { margin-bottom: 1rem; }
+  label { display: block; font-size: 13px; color: #666; margin-bottom: 6px; font-weight: 500; }
+  input, select { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; background: #fff; color: #1a1a1a; outline: none; }
+  input:focus, select:focus { border-color: #888; }
+  .btn-primary { width: 100%; padding: 12px; background: #1a1a1a; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 0.5rem; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-primary:hover:not(:disabled) { background: #333; }
+  .btn-back { background: transparent; border: 1px solid #ddd; color: #1a1a1a; border-radius: 8px; padding: 8px 14px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 4px; }
+  .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+  .top-bar h2 { margin: 0; }
+  .mode-card { border: 1px solid #e5e5e5; border-radius: 12px; padding: 1.25rem; cursor: pointer; margin-bottom: 10px; transition: background 0.15s; }
+  .mode-card:hover { background: #f9f9f9; }
+  .mode-card .title { font-size: 15px; font-weight: 600; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .mode-card .sub { font-size: 13px; color: #666; }
+  .photo-box { border: 1.5px dashed #ccc; border-radius: 8px; padding: 1.5rem; text-align: center; cursor: pointer; background: #fafafa; position: relative; }
+  .photo-box input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .photo-box .icon { font-size: 28px; color: #aaa; }
+  .photo-box p { font-size: 13px; color: #888; margin-top: 6px; }
+  .photo-preview { width: 100%; max-height: 200px; object-fit: cover; border-radius: 8px; display: none; margin-top: 8px; }
+  .status-opts { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 6px; }
+  .status-opt { border: 1px solid #e5e5e5; border-radius: 8px; padding: 12px 6px; text-align: center; cursor: pointer; font-size: 13px; color: #666; background: #fff; transition: all 0.15s; }
+  .status-opt.selected { border-color: #1a1a1a; background: #f5f5f5; color: #1a1a1a; font-weight: 600; }
+  .status-opt i { font-size: 18px; display: block; margin: 0 auto 4px; }
+  .success-card { background: #f5f5f5; border-radius: 12px; padding: 2rem; text-align: center; margin: 1rem 0; }
+  .success-card i { font-size: 52px; color: #3B6D11; display: block; margin-bottom: 1rem; }
+  .success-title { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+  .success-sub { font-size: 14px; color: #666; }
+  .err { font-size: 13px; color: #c0392b; margin-top: 8px; display: none; }
+  .tab-bar { display: flex; gap: 0; margin-bottom: 1.5rem; border-bottom: 1px solid #e5e5e5; }
+  .tab { padding: 8px 14px; cursor: pointer; font-size: 14px; color: #888; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab.active { color: #1a1a1a; border-bottom-color: #1a1a1a; font-weight: 600; }
+  .checkin-card { border: 1px solid #e5e5e5; border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 10px; }
+  .checkin-card img { width: 100%; max-height: 160px; object-fit: cover; border-radius: 8px; margin-top: 10px; }
+  .badge { display: inline-block; font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: 600; }
+  .badge-ok { background: #EAF3DE; color: #3B6D11; }
+  .badge-help { background: #FAEEDA; color: #854F0B; }
+  .badge-sos { background: #FCEBEB; color: #A32D2D; }
+  .ci-name { font-size: 15px; font-weight: 600; }
+  .ci-loc { font-size: 13px; color: #666; margin-top: 2px; }
+  .ci-meta { font-size: 12px; color: #aaa; margin-top: 3px; }
+  .ci-head { display: flex; justify-content: space-between; align-items: flex-start; }
+  .counter-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 1.5rem; }
+  .counter-box { background: #f5f5f5; border-radius: 8px; padding: 10px; text-align: center; }
+  .counter-box .num { font-size: 22px; font-weight: 700; }
+  .counter-box .lbl { font-size: 11px; color: #888; margin-top: 2px; }
+  .empty { text-align: center; padding: 3rem; color: #aaa; font-size: 14px; }
+  .empty i { font-size: 36px; display: block; margin-bottom: 8px; }
+  .loading { text-align: center; padding: 2rem; color: #aaa; font-size: 14px; }
+  .refresh-btn { background: transparent; border: 1px solid #ddd; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 4px; color: #666; }
+  .dash-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+  .pass-box { background: #f5f5f5; border-radius: 12px; padding: 2rem; margin-top: 1rem; }
+  .pass-box p { font-size: 14px; color: #666; margin-bottom: 1rem; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div id="page-mode" class="page active">
+    <h2>🎢 Cedar Point check-in</h2>
+    <p style="font-size:14px;color:#666;margin-bottom:1.5rem;">Are you a kid on the trip or a volunteer?</p>
+    <div class="mode-card" onclick="showPage('page-checkin')">
+      <div class="title"><i class="ti ti-user"></i> I'm on the trip</div>
+      <div class="sub">Check in with your group every hour</div>
+    </div>
+    <div class="mode-card" onclick="showPage('page-password')">
+      <div class="title"><i class="ti ti-layout-dashboard"></i> I'm a volunteer</div>
+      <div class="sub">View all live check-ins and photos</div>
+    </div>
+  </div>
+
+  <div id="page-password" class="page">
+    <div class="top-bar">
+      <h2>Volunteer access</h2>
+      <button class="btn-back" onclick="showPage('page-mode')"><i class="ti ti-arrow-left"></i> Back</button>
+    </div>
+    <div class="pass-box">
+      <p>Enter the volunteer password to continue.</p>
+      <div class="field">
+        <input type="password" id="pass-input" placeholder="Password" onkeydown="if(event.key==='Enter')checkPass()" />
+      </div>
+      <button class="btn-primary" onclick="checkPass()">Continue</button>
+      <p id="pass-error" class="err">Wrong password. Try again.</p>
+    </div>
+  </div>
+
+  <div id="page-checkin" class="page">
+    <div class="top-bar">
+      <h2>Check in</h2>
+      <button class="btn-back" onclick="showPage('page-mode')"><i class="ti ti-arrow-left"></i> Back</button>
+    </div>
+    <div class="field">
+      <label>Your name</label>
+      <input type="text" id="name" placeholder="First and last name" />
+    </div>
+    <div class="field">
+      <label>Who are you with?</label>
+      <input type="text" id="with" placeholder="Names of friends you're with" />
+    </div>
+    <div class="field">
+      <label>Where are you right now?</label>
+      <select id="location">
+        <option value="">Select a location...</option>
+        <option>Front Gate / Main Midway</option>
+        <option>Millennium Force / Top Thrill area</option>
+        <option>Magnum / Raptor area</option>
+        <option>Maverick / Frontier Town</option>
+        <option>Valravn / Blue Streak area</option>
+        <option>Gatekeeper area</option>
+        <option>Cedar Downs / Kiddie Kingdom</option>
+        <option>Planet Snoopy</option>
+        <option>Breakers / Hotel area</option>
+        <option>Food / Restrooms</option>
+        <option>Other (specify below)</option>
+      </select>
+    </div>
+    <div class="field" id="other-field" style="display:none;">
+      <label>Where specifically?</label>
+      <input type="text" id="other-loc" placeholder="Describe where you are" />
+    </div>
+    <div class="field">
+      <label>Group photo</label>
+      <div class="photo-box" id="photo-box">
+        <i class="ti ti-camera icon"></i>
+        <p>Tap to take or upload a photo</p>
+        <input type="file" accept="image/*" capture="environment" id="photo-input" onchange="handlePhoto(this)" />
+      </div>
+      <img id="photo-preview" class="photo-preview" alt="Preview" />
+    </div>
+    <div class="field">
+      <label>Everything good?</label>
+      <div class="status-opts">
+        <div class="status-opt" data-val="All good" onclick="selectStatus(this)">
+          <i class="ti ti-check" style="color:#3B6D11;"></i>All good
+        </div>
+        <div class="status-opt" data-val="Needs help" onclick="selectStatus(this)">
+          <i class="ti ti-alert-triangle" style="color:#854F0B;"></i>Need help
+        </div>
+        <div class="status-opt" data-val="EMERGENCY" onclick="selectStatus(this)">
+          <i class="ti ti-sos" style="color:#A32D2D;"></i>Emergency
+        </div>
+      </div>
+    </div>
+    <button class="btn-primary" id="submit-btn" onclick="submitCheckin()">Submit check-in</button>
+    <p id="form-error" class="err"></p>
+  </div>
+
+  <div id="page-success" class="page">
+    <div class="success-card">
+      <i class="ti ti-circle-check"></i>
+      <div class="success-title">Checked in!</div>
+      <div class="success-sub" id="success-msg"></div>
+    </div>
+    <button class="btn-primary" onclick="resetForm()">Check in again later</button>
+  </div>
+
+  <div id="page-dashboard" class="page">
+    <div class="top-bar">
+      <h2>Volunteer view</h2>
+      <button class="btn-back" onclick="showPage('page-mode')"><i class="ti ti-arrow-left"></i> Back</button>
+    </div>
+    <div class="counter-row">
+      <div class="counter-box"><div class="num" id="cnt-total">0</div><div class="lbl">Total</div></div>
+      <div class="counter-box"><div class="num" id="cnt-ok" style="color:#3B6D11;">0</div><div class="lbl">All good</div></div>
+      <div class="counter-box"><div class="num" id="cnt-help" style="color:#854F0B;">0</div><div class="lbl">Need help</div></div>
+      <div class="counter-box"><div class="num" id="cnt-sos" style="color:#A32D2D;">0</div><div class="lbl">Emergency</div></div>
+    </div>
+    <div class="dash-topbar">
+      <div class="tab-bar" style="border:none;margin:0;">
+        <div class="tab active" onclick="filterDash('all',this)">All</div>
+        <div class="tab" onclick="filterDash('All good',this)">Good</div>
+        <div class="tab" onclick="filterDash('Needs help',this)">Help</div>
+        <div class="tab" onclick="filterDash('EMERGENCY',this)">SOS</div>
+      </div>
+      <button class="refresh-btn" onclick="loadDash()"><i class="ti ti-refresh"></i> Refresh</button>
+    </div>
+    <div id="dash-list"><div class="loading">Loading check-ins...</div></div>
+  </div>
+
+</div>
+
+<script>
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxi1rnaYoVbF6hOnFr-0ihyPgNO_diGWS50SDHh5otb1LMuWxbtSq3XY4I8AxhxgWN1Mg/exec';
+const VOLUNTEER_PASS = 'Pinckney1!';
+let selectedStatus = '';
+let photoData = null;
+let allCheckins = [];
+let dashFilter = 'all';
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function checkPass() {
+  const val = document.getElementById('pass-input').value;
+  const err = document.getElementById('pass-error');
+  if (val === VOLUNTEER_PASS) {
+    err.style.display = 'none';
+    document.getElementById('pass-input').value = '';
+    showPage('page-dashboard');
+    loadDash();
+  } else {
+    err.style.display = 'block';
+  }
+}
+
+document.getElementById('location').addEventListener('change', function() {
+  document.getElementById('other-field').style.display = this.value === 'Other (specify below)' ? 'block' : 'none';
+});
+
+function selectStatus(el) {
+  document.querySelectorAll('.status-opt').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedStatus = el.dataset.val;
+}
+
+function handlePhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const canvas = document.createElement('canvas');
+  const img = new Image();
+  const reader = new FileReader();
+  reader.onload = e => {
+    img.onload = () => {
+      const MAX = 600;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      photoData = canvas.toDataURL('image/jpeg', 0.6);
+      const preview = document.getElementById('photo-preview');
+      preview.src = photoData;
+      preview.style.display = 'block';
+      document.getElementById('photo-box').style.display = 'none';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function submitCheckin() {
+  const name = document.getElementById('name').value.trim();
+  const withPeople = document.getElementById('with').value.trim();
+  const loc = document.getElementById('location').value;
+  const otherLoc = document.getElementById('other-loc').value.trim();
+  const btn = document.getElementById('submit-btn');
+
+  if (!name) { showErr('Please enter your name.'); return; }
+  if (!withPeople) { showErr('Please enter who you are with.'); return; }
+  if (!loc) { showErr('Please select a location.'); return; }
+  if (!selectedStatus) { showErr('Please select a status.'); return; }
+  document.getElementById('form-error').style.display = 'none';
+
+  const finalLoc = loc === 'Other (specify below)' ? (otherLoc || 'Other') : loc;
+  btn.disabled = true;
+  btn.textContent = 'Submitting...';
+
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, with: withPeople, location: finalLoc, status: selectedStatus, photo: photoData || '' })
+    });
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('success-msg').textContent = `${name} checked in at ${finalLoc} — ${timeStr}`;
+    showPage('page-success');
+  } catch(e) {
+    showErr('Something went wrong. Check your connection and try again.');
+  }
+  btn.disabled = false;
+  btn.textContent = 'Submit check-in';
+}
+
+function showErr(msg) {
+  const err = document.getElementById('form-error');
+  err.textContent = msg;
+  err.style.display = 'block';
+}
+
+function resetForm() {
+  document.getElementById('name').value = '';
+  document.getElementById('with').value = '';
+  document.getElementById('location').value = '';
+  document.getElementById('other-loc').value = '';
+  document.getElementById('other-field').style.display = 'none';
+  document.querySelectorAll('.status-opt').forEach(o => o.classList.remove('selected'));
+  selectedStatus = '';
+  photoData = null;
+  document.getElementById('photo-preview').style.display = 'none';
+  document.getElementById('photo-box').style.display = 'block';
+  document.getElementById('photo-input').value = '';
+  showPage('page-checkin');
+}
+
+async function loadDash() {
+  document.getElementById('dash-list').innerHTML = '<div class="loading">Loading check-ins...</div>';
+  try {
+    const res = await fetch(SCRIPT_URL + '?action=get');
+    const data = await res.json();
+    allCheckins = data.checkins || [];
+    renderDash();
+  } catch(e) {
+    document.getElementById('dash-list').innerHTML = '<div class="empty"><i class="ti ti-wifi-off"></i>Could not load check-ins.<br>Make sure the Apps Script is redeployed with the latest code.</div>';
+  }
+}
+
+function filterDash(val, el) {
+  dashFilter = val;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderDash();
+}
+
+function renderDash() {
+  const filtered = dashFilter === 'all' ? allCheckins : allCheckins.filter(c => c.status === dashFilter);
+  document.getElementById('cnt-total').textContent = allCheckins.length;
+  document.getElementById('cnt-ok').textContent = allCheckins.filter(c => c.status === 'All good').length;
+  document.getElementById('cnt-help').textContent = allCheckins.filter(c => c.status === 'Needs help').length;
+  document.getElementById('cnt-sos').textContent = allCheckins.filter(c => c.status === 'EMERGENCY').length;
+
+  const list = document.getElementById('dash-list');
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="empty"><i class="ti ti-inbox"></i>No check-ins yet</div>';
+    return;
+  }
+
+  const badgeClass = { 'All good': 'badge-ok', 'Needs help': 'badge-help', 'EMERGENCY': 'badge-sos' };
+  list.innerHTML = [...filtered].reverse().map(c => `
+    <div class="checkin-card">
+      <div class="ci-head">
+        <div>
+          <div class="ci-name">${c.name}</div>
+          <div class="ci-loc"><i class="ti ti-map-pin" style="font-size:12px;vertical-align:-1px;margin-right:3px;"></i>${c.location}</div>
+          <div class="ci-meta">With: ${c.with}</div>
+        </div>
+        <div style="text-align:right;">
+          <span class="badge ${badgeClass[c.status] || 'badge-ok'}">${c.status}</span>
+          <div class="ci-meta" style="margin-top:4px;">${c.time}</div>
+        </div>
+      </div>
+      ${c.photo ? `<img src="${c.photo}" alt="Group photo" />` : '<div style="font-size:12px;color:#aaa;margin-top:8px;">No photo submitted</div>'}
+    </div>
+  `).join('');
+}
+</script>
+</body>
+</html>
