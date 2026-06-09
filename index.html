@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Cedar Point Check-In</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #1a1a1a; min-height: 100vh; }
@@ -20,6 +21,11 @@
   .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
   .btn-primary:hover:not(:disabled) { background: #333; }
   .btn-back { background: transparent; border: 1px solid #ddd; color: #1a1a1a; border-radius: 8px; padding: 8px 14px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 4px; }
+  .btn-danger { background: transparent; border: 1px solid #f09595; color: #A32D2D; border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .btn-danger:hover { background: #FCEBEB; }
+  .btn-export { background: #1a1a1a; color: #fff; border: none; border-radius: 8px; padding: 10px 16px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .btn-export:hover { background: #333; }
+  .btn-export:disabled { opacity: 0.5; cursor: not-allowed; }
   .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
   .top-bar h2 { margin: 0; }
   .mode-card { border: 1px solid #e5e5e5; border-radius: 12px; padding: 1.25rem; cursor: pointer; margin-bottom: 10px; transition: background 0.15s; }
@@ -52,7 +58,7 @@
   .ci-name { font-size: 15px; font-weight: 600; }
   .ci-loc { font-size: 13px; color: #666; margin-top: 2px; }
   .ci-meta { font-size: 12px; color: #aaa; margin-top: 3px; }
-  .ci-head { display: flex; justify-content: space-between; align-items: flex-start; }
+  .ci-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
   .counter-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 1.5rem; }
   .counter-box { background: #f5f5f5; border-radius: 8px; padding: 10px; text-align: center; }
   .counter-box .num { font-size: 22px; font-weight: 700; }
@@ -66,8 +72,18 @@
   .lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 999; align-items: center; justify-content: center; }
   .lightbox.open { display: flex; }
   .lightbox img { max-width: 95vw; max-height: 90vh; border-radius: 8px; }
-  .lightbox-close { position: fixed; top: 16px; right: 16px; color: #fff; font-size: 32px; cursor: pointer; background: none; border: none; }
+  .lightbox-close { position: fixed; top: 16px; right: 16px; color: #fff; font-size: 32px; cursor: pointer; background: none; border: none; line-height: 1; }
   .sos-banner { background: #FCEBEB; border: 1px solid #f09595; border-radius: 8px; padding: 10px 14px; font-size: 14px; color: #A32D2D; font-weight: 600; margin-bottom: 1rem; display: none; }
+  .export-bar { background: #f5f5f5; border-radius: 10px; padding: 1rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .export-bar p { font-size: 13px; color: #666; }
+  .confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 998; align-items: center; justify-content: center; }
+  .confirm-overlay.open { display: flex; }
+  .confirm-box { background: #fff; border-radius: 12px; padding: 1.5rem; max-width: 300px; width: 90%; text-align: center; }
+  .confirm-box p { font-size: 15px; margin-bottom: 1.25rem; color: #1a1a1a; }
+  .confirm-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .confirm-btns button { padding: 10px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; border: 1px solid #ddd; }
+  .confirm-yes { background: #A32D2D; color: #fff; border-color: #A32D2D !important; }
+  .confirm-no { background: #fff; color: #1a1a1a; }
   .note { font-size: 12px; color: #aaa; text-align: center; margin-top: 1rem; }
 </style>
 </head>
@@ -185,6 +201,10 @@
       <div class="counter-box"><div class="num" id="cnt-help" style="color:#854F0B;">0</div><div class="lbl">Need help</div></div>
       <div class="counter-box"><div class="num" id="cnt-sos" style="color:#A32D2D;">0</div><div class="lbl">Emergency</div></div>
     </div>
+    <div class="export-bar">
+      <p>Export all check-ins + photos as a ZIP file</p>
+      <button class="btn-export" id="export-btn" onclick="exportAll()"><i class="ti ti-download"></i> Export</button>
+    </div>
     <div class="dash-topbar">
       <div class="tab-bar" style="border:none;margin:0;">
         <div class="tab active" onclick="filterDash('all',this)">All</div>
@@ -200,8 +220,18 @@
 </div>
 
 <div class="lightbox" id="lightbox" onclick="closeLightbox()">
-  <button class="lightbox-close"><i class="ti ti-x"></i></button>
+  <button class="lightbox-close" onclick="closeLightbox()"><i class="ti ti-x"></i></button>
   <img id="lightbox-img" src="" alt="Full photo" onclick="event.stopPropagation()" />
+</div>
+
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <p id="confirm-msg">Delete this check-in?</p>
+    <div class="confirm-btns">
+      <button class="confirm-no" onclick="closeConfirm()">Cancel</button>
+      <button class="confirm-yes" id="confirm-yes-btn">Delete</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -212,16 +242,22 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxi1rnaYoVbF6hOnFr-0
 let selectedStatus = '';
 let photoData = null;
 let dashFilter = 'all';
+let pendingDeleteIndex = null;
 
 function getCheckins() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(e) { return []; }
 }
 
+function saveAll(list) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch(e) {}
+}
+
 function saveCheckin(entry) {
   const list = getCheckins();
   list.push(entry);
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch(e) {
-    // storage full, try saving without photo
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  } catch(e) {
     entry.photo = '';
     list[list.length - 1] = entry;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch(e2) {}
@@ -304,13 +340,11 @@ async function submitCheckin() {
 
   btn.disabled = true;
   btn.textContent = 'Submitting...';
-
   saveCheckin(entry);
 
   try {
     await fetch(SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
+      method: 'POST', mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, with: withPeople, location: finalLoc, status: selectedStatus, photo: '' })
     });
@@ -359,8 +393,10 @@ function renderDash() {
   document.getElementById('cnt-help').textContent = all.filter(c => c.status === 'Needs help').length;
   document.getElementById('cnt-sos').textContent = all.filter(c => c.status === 'EMERGENCY').length;
 
-  const hasSOS = all.some(c => c.status === 'EMERGENCY');
-  document.getElementById('sos-banner').style.display = hasSOS ? 'block' : 'none';
+  document.getElementById('sos-banner').style.display = all.some(c => c.status === 'EMERGENCY') ? 'block' : 'none';
+
+  const exportBtn = document.getElementById('export-btn');
+  exportBtn.disabled = all.length === 0;
 
   const list = document.getElementById('dash-list');
   if (filtered.length === 0) {
@@ -369,22 +405,45 @@ function renderDash() {
   }
 
   const badgeClass = { 'All good': 'badge-ok', 'Needs help': 'badge-help', 'EMERGENCY': 'badge-sos' };
-  list.innerHTML = [...filtered].reverse().map(c => `
+
+  const reversedFiltered = [...filtered].reverse();
+  list.innerHTML = reversedFiltered.map((c) => {
+    const realIndex = getCheckins().lastIndexOf(c);
+    return `
     <div class="checkin-card" style="${c.status === 'EMERGENCY' ? 'border-color:#f09595;' : c.status === 'Needs help' ? 'border-color:#FAC775;' : ''}">
       <div class="ci-head">
-        <div>
+        <div style="flex:1;min-width:0;">
           <div class="ci-name">${c.name}</div>
           <div class="ci-loc"><i class="ti ti-map-pin" style="font-size:12px;vertical-align:-1px;margin-right:3px;"></i>${c.location}</div>
           <div class="ci-meta">With: ${c.with}</div>
           <div class="ci-meta">${c.date} at ${c.time}</div>
+          <div style="margin-top:6px;"><span class="badge ${badgeClass[c.status] || 'badge-ok'}">${c.status}</span></div>
         </div>
-        <div style="text-align:right;">
-          <span class="badge ${badgeClass[c.status] || 'badge-ok'}">${c.status}</span>
-        </div>
+        <button class="btn-danger" onclick="confirmDelete(${realIndex})"><i class="ti ti-trash"></i> Delete</button>
       </div>
       ${c.photo ? `<img src="${c.photo}" alt="Group photo" onclick="openLightbox(this.src)" title="Tap to enlarge" />` : '<div style="font-size:12px;color:#aaa;margin-top:8px;">No photo submitted</div>'}
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
+}
+
+function confirmDelete(index) {
+  pendingDeleteIndex = index;
+  const all = getCheckins();
+  const c = all[index];
+  document.getElementById('confirm-msg').textContent = `Delete check-in from ${c.name}?`;
+  document.getElementById('confirm-overlay').classList.add('open');
+  document.getElementById('confirm-yes-btn').onclick = () => {
+    const list = getCheckins();
+    list.splice(pendingDeleteIndex, 1);
+    saveAll(list);
+    closeConfirm();
+    renderDash();
+  };
+}
+
+function closeConfirm() {
+  document.getElementById('confirm-overlay').classList.remove('open');
+  pendingDeleteIndex = null;
 }
 
 function openLightbox(src) {
@@ -394,6 +453,46 @@ function openLightbox(src) {
 
 function closeLightbox() {
   document.getElementById('lightbox').classList.remove('open');
+}
+
+async function exportAll() {
+  const all = getCheckins();
+  if (all.length === 0) return;
+
+  const btn = document.getElementById('export-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader"></i> Exporting...';
+
+  const zip = new JSZip();
+  const photosFolder = zip.folder('photos');
+
+  let csvRows = ['#,Name,With,Location,Status,Date,Time,Has Photo'];
+  all.forEach((c, i) => {
+    csvRows.push(`${i+1},"${c.name}","${c.with}","${c.location}","${c.status}","${c.date}","${c.time}","${c.photo ? 'Yes' : 'No'}"`);
+    if (c.photo) {
+      const base64Data = c.photo.split(',')[1];
+      const safeName = c.name.replace(/[^a-z0-9]/gi, '_');
+      photosFolder.file(`${String(i+1).padStart(3,'0')}_${safeName}_${c.time.replace(/[: ]/g,'')}.jpg`, base64Data, { base64: true });
+    }
+  });
+
+  zip.file('checkins.csv', csvRows.join('\n'));
+
+  const summary = all.map((c,i) =>
+    `[${i+1}] ${c.name}\n  With: ${c.with}\n  Location: ${c.location}\n  Status: ${c.status}\n  Time: ${c.date} at ${c.time}\n  Photo: ${c.photo ? 'Yes (see photos folder)' : 'No'}`
+  ).join('\n\n');
+  zip.file('summary.txt', `Cedar Point Check-In Summary\nExported: ${new Date().toLocaleString()}\nTotal check-ins: ${all.length}\n\n${summary}`);
+
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `cedar-point-checkins-${new Date().toISOString().slice(0,10)}.zip`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  btn.disabled = false;
+  btn.innerHTML = '<i class="ti ti-download"></i> Export';
 }
 </script>
 </body>
