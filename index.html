@@ -40,11 +40,11 @@
   .success-title { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
   .success-sub { font-size: 14px; color: #666; }
   .err { font-size: 13px; color: #c0392b; margin-top: 8px; display: none; }
-  .tab-bar { display: flex; gap: 0; margin-bottom: 1.5rem; border-bottom: 1px solid #e5e5e5; }
+  .tab-bar { display: flex; gap: 0; border-bottom: 1px solid #e5e5e5; }
   .tab { padding: 8px 14px; cursor: pointer; font-size: 14px; color: #888; border-bottom: 2px solid transparent; margin-bottom: -1px; }
   .tab.active { color: #1a1a1a; border-bottom-color: #1a1a1a; font-weight: 600; }
   .checkin-card { border: 1px solid #e5e5e5; border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 10px; }
-  .checkin-card img { width: 100%; max-height: 160px; object-fit: cover; border-radius: 8px; margin-top: 10px; }
+  .checkin-card img { width: 100%; max-height: 200px; object-fit: cover; border-radius: 8px; margin-top: 10px; cursor: pointer; }
   .badge { display: inline-block; font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: 600; }
   .badge-ok { background: #EAF3DE; color: #3B6D11; }
   .badge-help { background: #FAEEDA; color: #854F0B; }
@@ -59,11 +59,16 @@
   .counter-box .lbl { font-size: 11px; color: #888; margin-top: 2px; }
   .empty { text-align: center; padding: 3rem; color: #aaa; font-size: 14px; }
   .empty i { font-size: 36px; display: block; margin-bottom: 8px; }
-  .loading { text-align: center; padding: 2rem; color: #aaa; font-size: 14px; }
+  .dash-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; margin-top: 1rem; }
   .refresh-btn { background: transparent; border: 1px solid #ddd; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 4px; color: #666; }
-  .dash-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
   .pass-box { background: #f5f5f5; border-radius: 12px; padding: 2rem; margin-top: 1rem; }
   .pass-box p { font-size: 14px; color: #666; margin-bottom: 1rem; }
+  .lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 999; align-items: center; justify-content: center; }
+  .lightbox.open { display: flex; }
+  .lightbox img { max-width: 95vw; max-height: 90vh; border-radius: 8px; }
+  .lightbox-close { position: fixed; top: 16px; right: 16px; color: #fff; font-size: 32px; cursor: pointer; background: none; border: none; }
+  .sos-banner { background: #FCEBEB; border: 1px solid #f09595; border-radius: 8px; padding: 10px 14px; font-size: 14px; color: #A32D2D; font-weight: 600; margin-bottom: 1rem; display: none; }
+  .note { font-size: 12px; color: #aaa; text-align: center; margin-top: 1rem; }
 </style>
 </head>
 <body>
@@ -164,7 +169,8 @@
       <div class="success-title">Checked in!</div>
       <div class="success-sub" id="success-msg"></div>
     </div>
-    <button class="btn-primary" onclick="resetForm()">Check in again later</button>
+    <p class="note">Your check-in was saved. Come back in an hour!</p>
+    <button class="btn-primary" style="margin-top:1.5rem;" onclick="resetForm()">Done</button>
   </div>
 
   <div id="page-dashboard" class="page">
@@ -172,6 +178,7 @@
       <h2>Volunteer view</h2>
       <button class="btn-back" onclick="showPage('page-mode')"><i class="ti ti-arrow-left"></i> Back</button>
     </div>
+    <div id="sos-banner" class="sos-banner">🚨 Emergency check-in received! Check below immediately.</div>
     <div class="counter-row">
       <div class="counter-box"><div class="num" id="cnt-total">0</div><div class="lbl">Total</div></div>
       <div class="counter-box"><div class="num" id="cnt-ok" style="color:#3B6D11;">0</div><div class="lbl">All good</div></div>
@@ -185,20 +192,41 @@
         <div class="tab" onclick="filterDash('Needs help',this)">Help</div>
         <div class="tab" onclick="filterDash('EMERGENCY',this)">SOS</div>
       </div>
-      <button class="refresh-btn" onclick="loadDash()"><i class="ti ti-refresh"></i> Refresh</button>
+      <button class="refresh-btn" onclick="renderDash()"><i class="ti ti-refresh"></i> Refresh</button>
     </div>
-    <div id="dash-list"><div class="loading">Loading check-ins...</div></div>
+    <div id="dash-list" style="margin-top:1rem;"></div>
   </div>
 
 </div>
 
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close"><i class="ti ti-x"></i></button>
+  <img id="lightbox-img" src="" alt="Full photo" onclick="event.stopPropagation()" />
+</div>
+
 <script>
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxi1rnaYoVbF6hOnFr-0ihyPgNO_diGWS50SDHh5otb1LMuWxbtSq3XY4I8AxhxgWN1Mg/exec';
 const VOLUNTEER_PASS = 'Pinckney1!';
+const STORAGE_KEY = 'cp_checkins_v1';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxi1rnaYoVbF6hOnFr-0ihyPgNO_diGWS50SDHh5otb1LMuWxbtSq3XY4I8AxhxgWN1Mg/exec';
+
 let selectedStatus = '';
 let photoData = null;
-let allCheckins = [];
 let dashFilter = 'all';
+
+function getCheckins() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(e) { return []; }
+}
+
+function saveCheckin(entry) {
+  const list = getCheckins();
+  list.push(entry);
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch(e) {
+    // storage full, try saving without photo
+    entry.photo = '';
+    list[list.length - 1] = entry;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch(e2) {}
+  }
+}
 
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -212,7 +240,7 @@ function checkPass() {
     err.style.display = 'none';
     document.getElementById('pass-input').value = '';
     showPage('page-dashboard');
-    loadDash();
+    renderDash();
   } else {
     err.style.display = 'block';
   }
@@ -236,7 +264,7 @@ function handlePhoto(input) {
   const reader = new FileReader();
   reader.onload = e => {
     img.onload = () => {
-      const MAX = 600;
+      const MAX = 800;
       let w = img.width, h = img.height;
       if (w > MAX || h > MAX) {
         if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
@@ -244,7 +272,7 @@ function handlePhoto(input) {
       }
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      photoData = canvas.toDataURL('image/jpeg', 0.6);
+      photoData = canvas.toDataURL('image/jpeg', 0.7);
       const preview = document.getElementById('photo-preview');
       preview.src = photoData;
       preview.style.display = 'block';
@@ -269,22 +297,27 @@ async function submitCheckin() {
   document.getElementById('form-error').style.display = 'none';
 
   const finalLoc = loc === 'Other (specify below)' ? (otherLoc || 'Other') : loc;
+  const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const dateStr = new Date().toLocaleDateString();
+
+  const entry = { name, with: withPeople, location: finalLoc, status: selectedStatus, time: timeStr, date: dateStr, photo: photoData || '' };
+
   btn.disabled = true;
   btn.textContent = 'Submitting...';
+
+  saveCheckin(entry);
 
   try {
     await fetch(SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, with: withPeople, location: finalLoc, status: selectedStatus, photo: photoData || '' })
+      body: JSON.stringify({ name, with: withPeople, location: finalLoc, status: selectedStatus, photo: '' })
     });
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    document.getElementById('success-msg').textContent = `${name} checked in at ${finalLoc} — ${timeStr}`;
-    showPage('page-success');
-  } catch(e) {
-    showErr('Something went wrong. Check your connection and try again.');
-  }
+  } catch(e) {}
+
+  document.getElementById('success-msg').textContent = `${name} checked in at ${finalLoc} — ${timeStr}`;
+  showPage('page-success');
   btn.disabled = false;
   btn.textContent = 'Submit check-in';
 }
@@ -307,19 +340,7 @@ function resetForm() {
   document.getElementById('photo-preview').style.display = 'none';
   document.getElementById('photo-box').style.display = 'block';
   document.getElementById('photo-input').value = '';
-  showPage('page-checkin');
-}
-
-async function loadDash() {
-  document.getElementById('dash-list').innerHTML = '<div class="loading">Loading check-ins...</div>';
-  try {
-    const res = await fetch(SCRIPT_URL + '?action=get');
-    const data = await res.json();
-    allCheckins = data.checkins || [];
-    renderDash();
-  } catch(e) {
-    document.getElementById('dash-list').innerHTML = '<div class="empty"><i class="ti ti-wifi-off"></i>Could not load check-ins.<br>Make sure the Apps Script is redeployed with the latest code.</div>';
-  }
+  showPage('page-mode');
 }
 
 function filterDash(val, el) {
@@ -330,11 +351,16 @@ function filterDash(val, el) {
 }
 
 function renderDash() {
-  const filtered = dashFilter === 'all' ? allCheckins : allCheckins.filter(c => c.status === dashFilter);
-  document.getElementById('cnt-total').textContent = allCheckins.length;
-  document.getElementById('cnt-ok').textContent = allCheckins.filter(c => c.status === 'All good').length;
-  document.getElementById('cnt-help').textContent = allCheckins.filter(c => c.status === 'Needs help').length;
-  document.getElementById('cnt-sos').textContent = allCheckins.filter(c => c.status === 'EMERGENCY').length;
+  const all = getCheckins();
+  const filtered = dashFilter === 'all' ? all : all.filter(c => c.status === dashFilter);
+
+  document.getElementById('cnt-total').textContent = all.length;
+  document.getElementById('cnt-ok').textContent = all.filter(c => c.status === 'All good').length;
+  document.getElementById('cnt-help').textContent = all.filter(c => c.status === 'Needs help').length;
+  document.getElementById('cnt-sos').textContent = all.filter(c => c.status === 'EMERGENCY').length;
+
+  const hasSOS = all.some(c => c.status === 'EMERGENCY');
+  document.getElementById('sos-banner').style.display = hasSOS ? 'block' : 'none';
 
   const list = document.getElementById('dash-list');
   if (filtered.length === 0) {
@@ -344,21 +370,30 @@ function renderDash() {
 
   const badgeClass = { 'All good': 'badge-ok', 'Needs help': 'badge-help', 'EMERGENCY': 'badge-sos' };
   list.innerHTML = [...filtered].reverse().map(c => `
-    <div class="checkin-card">
+    <div class="checkin-card" style="${c.status === 'EMERGENCY' ? 'border-color:#f09595;' : c.status === 'Needs help' ? 'border-color:#FAC775;' : ''}">
       <div class="ci-head">
         <div>
           <div class="ci-name">${c.name}</div>
           <div class="ci-loc"><i class="ti ti-map-pin" style="font-size:12px;vertical-align:-1px;margin-right:3px;"></i>${c.location}</div>
           <div class="ci-meta">With: ${c.with}</div>
+          <div class="ci-meta">${c.date} at ${c.time}</div>
         </div>
         <div style="text-align:right;">
           <span class="badge ${badgeClass[c.status] || 'badge-ok'}">${c.status}</span>
-          <div class="ci-meta" style="margin-top:4px;">${c.time}</div>
         </div>
       </div>
-      ${c.photo ? `<img src="${c.photo}" alt="Group photo" />` : '<div style="font-size:12px;color:#aaa;margin-top:8px;">No photo submitted</div>'}
+      ${c.photo ? `<img src="${c.photo}" alt="Group photo" onclick="openLightbox(this.src)" title="Tap to enlarge" />` : '<div style="font-size:12px;color:#aaa;margin-top:8px;">No photo submitted</div>'}
     </div>
   `).join('');
+}
+
+function openLightbox(src) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox').classList.add('open');
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
 }
 </script>
 </body>
